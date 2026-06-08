@@ -1,7 +1,7 @@
 import streamlit as st
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 # 设置页面基本信息
 st.set_page_config(page_title="我的极限明信片数字馆", layout="wide")
@@ -31,9 +31,9 @@ uploaded_front = st.sidebar.file_uploader("上传明信片正面 (Pattern)", typ
 uploaded_back = st.sidebar.file_uploader("上传明信片反面 (Postmark)", type=["jpg", "png", "jpeg"])
 
 if uploaded_front and uploaded_back:
-    st.sidebar.success("图片上传成功！正在生成红黄交错马赛克...")
+    st.sidebar.success("图片上传成功！正在绘制浅色生肖像素遮挡...")
     
-    # ─── 红黄交错方块马赛克算法 ───
+    # ─── 浅色系生肖鼠像素画算法 ───
     back_img = Image.open(uploaded_back).convert("RGB")
     width, height = back_img.size
     
@@ -41,91 +41,39 @@ if uploaded_front and uploaded_back:
     crop_box = (int(width * 0.62), int(height * 0.52), int(width * 0.98), int(height * 0.82))
     cropped_zone = back_img.crop(crop_box)
     
-    # 将裁剪区域转为 numpy 矩阵进行像素处理
     img_array = np.array(cropped_zone)
     h_zone, w_zone, _ = img_array.shape
     
-    # 2. 设定马赛克颗粒大小（格子大小，数字越大格子越大）
-    pixel_size = 16 
+    # 2. 定义一个 12x16 的生肖鼠像素矩阵（1代表图案，0代表背景）
+    # 提取自你提供的生肖鼠剪纸轮廓简化版
+    RAT_PATTERN = [
+        [0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],
+        [0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0],
+        [0,0,0,1,1,1,0,0,1,1,1,1,0,0,0,0],
+        [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+        [0,1,1,1,0,0,1,1,1,0,1,1,1,1,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1],
+        [1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,1],
+        [0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+        [0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+        [0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0],
+        [0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0],
+    ]
     
-    # 定义标准中国红和金黄色的 RGB 颜色
-    COLOR_RED = [230, 30, 30]     # 红
-    COLOR_YELLOW = [255, 215, 0]  # 黄
+    # 3. 设定浅色系配色（低饱和度、柔和的马卡龙暖色调）
+    COLOR_BG = [250, 245, 235]       # 极浅的米白纸张底色（覆盖文字）
+    COLOR_RAT_1 = [245, 180, 180]    # 柔和浅粉红（生肖鼠主色）
+    COLOR_RAT_2 = [250, 225, 160]    # 柔和浅米黄（生肖鼠配色）
     
-    # 3. 双层循环遍历每个方块，进行红黄交错染色
-    for y in range(0, h_zone, pixel_size):
-        for x in range(0, w_zone, pixel_size):
-            # 确定当前格子的边界
-            y_end = min(y + pixel_size, h_zone)
-            x_end = min(x + pixel_size, w_zone)
-            
-            # 根据格子在行列中的奇偶位置（X坐标+Y坐标的格子索引），决定它是红色还是黄色
-            grid_x = x // pixel_size
-            grid_y = y // pixel_size
-            
-            if (grid_x + grid_y) % 2 == 0:
-                chosen_color = COLOR_RED
-            else:
-                chosen_color = COLOR_YELLOW
-                
-            # 将这个小方块区域强制填充为选定的颜色
-            img_array[y:y_end, x:x_end] = chosen_color
-            
-    # 4. 把处理好的马赛克拼回原图
-    mosaic_zone = Image.fromarray(img_array)
-    back_img.paste(mosaic_zone, crop_box)
-    # ─── 算法结束 ───
+    # 计算每个像素格子的大小，使其刚好填满地址栏
+    rows = len(RAT_PATTERN)
+    cols_count = len(RAT_PATTERN[0])
+    pixel_h = h_zone // rows
+    pixel_w = w_zone // cols_count
     
-    st.sidebar.image(back_img, caption="红黄交错马赛克预览", use_column_width=True)
-    
-    # 录入表单
-    st.sidebar.subheader("信息核对")
-    title = st.sidebar.text_input("系列/名称", value="中华十二生肖 - 未命名")
-    loc_from = st.sidebar.text_input("寄发地", value="AI识别中...")
-    date_from = st.sidebar.date_input("寄发时间")
-    rating = st.sidebar.slider("给极限片评级", 1, 5, 5)
-    
-    if st.sidebar.button("确认入库"):
-        st.session_state.cards.append({
-            "id": len(st.session_state.cards) + 1,
-            "title": title,
-            "front_url": uploaded_front,
-            "back_url": back_img, 
-            "date_from": str(date_from),
-            "date_to": "-",
-            "loc_from": loc_from,
-            "loc_to": "-",
-            "rating": rating,
-            "scenery_stamp": "未知"
-        })
-        st.rerun()
-
-# ----------------- 主界面：陈列馆展示 -----------------
-st.header("🖼️ 我的明信片陈列展厅")
-
-# 筛选器
-search_query = st.text_input("🔍 搜索系列、地名或时间...")
-
-# 展现明信片列表
-cols = st.columns(3)
-
-for idx, card in enumerate(st.session_state.cards):
-    if search_query and search_query not in card['title'] and search_query not in card['loc_from']:
-        continue
-        
-    with cols[idx % 3]:
-        st.subheader(card['title'])
-        
-        tab1, tab2 = st.tabs(["🌟 正面图案", "📬 邮戳反面 (已脱敏)"])
-        with tab1:
-            st.image(card['front_url'], use_column_width=True)
-        with tab2:
-            st.image(card['back_url'], use_column_width=True)
-            
-        st.markdown(f"""
-        * **寄发路线**：{card['loc_from']} ➡️ {card['loc_to']}
-        * **寄发日期**：{card['date_from']}
-        * **风景戳**：{card['scenery_stamp']}
-        * **系统评级**：{'⭐' * card['rating']}
-        """)
-        st.markdown("---")
+    # 4. 遍历矩阵绘制像素画
+    for r in range(rows):
+        for c in range(cols_count):
+            y_start = r * pixel_h
+            y_end =
