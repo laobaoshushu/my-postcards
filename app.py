@@ -1,7 +1,7 @@
 import streamlit as st
 import cv2
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 
 # 设置页面基本信息
 st.set_page_config(page_title="我的极限明信片数字馆", layout="wide")
@@ -31,34 +31,52 @@ uploaded_front = st.sidebar.file_uploader("上传明信片正面 (Pattern)", typ
 uploaded_back = st.sidebar.file_uploader("上传明信片反面 (Postmark)", type=["jpg", "png", "jpeg"])
 
 if uploaded_front and uploaded_back:
-    st.sidebar.success("图片上传成功！正在生成艺术毛玻璃遮挡...")
+    st.sidebar.success("图片上传成功！正在生成红黄交错马赛克...")
     
-    # ─── 高级红黄毛玻璃算法 ───
+    # ─── 红黄交错方块马赛克算法 ───
     back_img = Image.open(uploaded_back).convert("RGB")
     width, height = back_img.size
     
-    # 1. 确定遮挡的区域（针对你提供的明信片格式，动态定位右下角地址栏文字）
-    # 仅遮挡文字部分，不破坏周围的空白和邮戳
+    # 1. 定位地址文字区域
     crop_box = (int(width * 0.62), int(height * 0.52), int(width * 0.98), int(height * 0.82))
     cropped_zone = back_img.crop(crop_box)
     
-    # 2. 制作毛玻璃效果：极度模糊文字
-    blurred_zone = cropped_zone.filter(ImageFilter.GaussianBlur(radius=15))
+    # 将裁剪区域转为 numpy 矩阵进行像素处理
+    img_array = np.array(cropped_zone)
+    h_zone, w_zone, _ = img_array.shape
     
-    # 3. 注入红黄暖色调（艺术滤镜）
-    # 将图片转为矩阵以便调整色彩
-    img_array = np.array(blurred_zone).astype(np.float32)
-    # 增强红色通道(R)和绿色通道(G)，混合出温暖的红黄色调，同时保持原本文字的光影感
-    img_array[:, :, 0] = np.clip(img_array[:, :, 0] * 1.4 + 40, 0, 255) # 增强红
-    img_array[:, :, 1] = np.clip(img_array[:, :, 1] * 1.1 + 20, 0, 255) # 增强黄
-    img_array[:, :, 2] = np.clip(img_array[:, :, 2] * 0.7, 0, 255)      # 压低蓝
+    # 2. 设定马赛克颗粒大小（格子大小，数字越大格子越大）
+    pixel_size = 16 
     
-    # 4. 把调色后的毛玻璃拼回原图
-    final_blurred_zone = Image.fromarray(img_array.astype(np.uint8))
-    back_img.paste(final_blurred_zone, crop_box)
+    # 定义标准中国红和金黄色的 RGB 颜色
+    COLOR_RED = [230, 30, 30]     # 红
+    COLOR_YELLOW = [255, 215, 0]  # 黄
+    
+    # 3. 双层循环遍历每个方块，进行红黄交错染色
+    for y in range(0, h_zone, pixel_size):
+        for x in range(0, w_zone, pixel_size):
+            # 确定当前格子的边界
+            y_end = min(y + pixel_size, h_zone)
+            x_end = min(x + pixel_size, w_zone)
+            
+            # 根据格子在行列中的奇偶位置（X坐标+Y坐标的格子索引），决定它是红色还是黄色
+            grid_x = x // pixel_size
+            grid_y = y // pixel_size
+            
+            if (grid_x + grid_y) % 2 == 0:
+                chosen_color = COLOR_RED
+            else:
+                chosen_color = COLOR_YELLOW
+                
+            # 将这个小方块区域强制填充为选定的颜色
+            img_array[y:y_end, x:x_end] = chosen_color
+            
+    # 4. 把处理好的马赛克拼回原图
+    mosaic_zone = Image.fromarray(img_array)
+    back_img.paste(mosaic_zone, crop_box)
     # ─── 算法结束 ───
     
-    st.sidebar.image(back_img, caption="红黄毛玻璃隐私脱敏预览", use_column_width=True)
+    st.sidebar.image(back_img, caption="红黄交错马赛克预览", use_column_width=True)
     
     # 录入表单
     st.sidebar.subheader("信息核对")
