@@ -75,5 +75,5 @@ if uploaded_front and uploaded_back:
     # 4. 遍历矩阵绘制像素画
     for r in range(rows):
         for c in range(cols_count):
-            y_start = r * pixel_h
-            y_end =
+y_end = min((r + 1) * pixel_h, h_zone)
+x_end = min((c + 1) * pixel_w, w_zone)
