@@ -1,5 +1,4 @@
 import streamlit as st
-import cv2
 import numpy as np
 from PIL import Image
 
@@ -31,52 +30,39 @@ uploaded_front = st.sidebar.file_uploader("上传明信片正面 (Pattern)", typ
 uploaded_back = st.sidebar.file_uploader("上传明信片反面 (Postmark)", type=["jpg", "png", "jpeg"])
 
 if uploaded_front and uploaded_back:
-    st.sidebar.success("图片上传成功！正在智能识别地址标签...")
+    st.sidebar.success("图片上传成功！")
     
     # 读取原始图片
     original_img = Image.open(uploaded_back).convert("RGB")
+    w_orig, h_orig = original_img.size
+    
+    # ─── 手动交互式视觉修正控制台 ───
+    st.sidebar.subheader("🎯 微调遮挡范围")
+    st.sidebar.write("通过下方滑块，完美对齐右侧明信片上的地址区域：")
+    
+    # 默认值设定在大概的右下角
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        x_start_pct = st.slider("左边界位置 (%)", 0, 100, 60)
+        y_start_pct = st.slider("上边界位置 (%)", 0, 100, 50)
+    with col2:
+        x_end_pct = st.slider("右边界位置 (%)", 0, 100, 98)
+        y_end_pct = st.slider("下边界位置 (%)", 0, 100, 85)
+        
+    # 计算实际像素坐标
+    x1, y1 = int(w_orig * (x_start_pct / 100)), int(h_orig * (y_start_pct / 100))
+    x2, y2 = int(w_orig * (x_end_pct / 100)), int(h_orig * (y_end_pct / 100))
+    
+    # 防止边界颠倒异常
+    if x2 <= x1: x2 = x1 + 10
+    if y2 <= y1: y2 = y1 + 10
+    
+    # 开始生成涂改带
     img_np = np.array(original_img)
-    h_orig, w_orig, _ = img_np.shape
-    
-    # ─── 智能名址贴轮廓识别算法 ───
-    # 1. 默认保底区域（万一AI识别失败，采用这个紧凑区域保底）
-    x1, y1, x2, y2 = int(w_orig * 0.64), int(h_orig * 0.53), int(w_orig * 0.96), int(h_orig * 0.82)
-    
-    try:
-        # 转为 OpenCV 的 BGR 格式进行图像处理
-        gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-        
-        # 针对右下角名址贴进行二值化：把白色的名址标签纸凸显出来
-        _, thresh = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)
-        
-        # 寻找图像中的所有闭合轮廓
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        best_box = None
-        max_area = 0
-        
-        for cnt in contours:
-            x, y, w, h = cv2.boundingRect(cnt)
-            # 过滤条件：地址贴应该在右下角，且面积大小要适中
-            if x > w_orig * 0.5 and y > h_orig * 0.4:
-                area = w * h
-                # 寻找右下角面积最大的那个白色矩形块
-                if area > max_area and w > w_orig * 0.2 and h > h_orig * 0.1:
-                    max_area = area
-                    best_box = (x, y, x + w, y + h)
-        
-        if best_box:
-            # 成功识别到白色地址标签，内缩2像素使马赛克边缘更贴合，不溢出白条
-            x1, y1, x2, y2 = best_box
-            x1, y1, x2, y2 = x1 + 2, y1 + 2, x2 - 2, y2 - 2
-    except Exception as e:
-        pass # 如果识别出错，自动降级使用默认保底区域
-        
-    # 2. 精准裁剪识别出来的地址块
     cropped_zone = img_np[y1:y2, x1:x2]
     h_zone, w_zone, _ = cropped_zone.shape
     
-    # 3. 生成极高密度的微型浅色像素点（5x5像素，彻底糊掉文字）
+    # 生成高密度编织马赛克效果
     pixel_size = 5
     COLOR_1 = [245, 215, 215]  # 浅樱花粉
     COLOR_2 = [252, 242, 215]  # 浅香草黄
@@ -99,12 +85,12 @@ if uploaded_front and uploaded_back:
                 
             cropped_zone[y:y_end, x:x_end] = chosen_color
             
-    # 4. 把处理好的高密度像素涂改带贴回原图
+    # 将涂改带精准贴回
     img_np[y1:y2, x1:x2] = cropped_zone
     back_img = Image.fromarray(img_np)
-    # ─── 算法结束 ───
     
-    st.sidebar.image(back_img, caption="智能动态遮挡预览", use_column_width=True)
+    # 动态预览
+    st.sidebar.image(back_img, caption="实时微调预览（请检查是否完美遮挡）", use_column_width=True)
     
     # 录入表单
     st.sidebar.subheader("信息核对")
