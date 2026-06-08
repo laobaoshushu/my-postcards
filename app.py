@@ -64,7 +64,7 @@ if uploaded_front and uploaded_back:
             "rating": rating,
             "scenery_stamp": "未知"
         })
-        st.sidebar.experimental_rerun()
+        st.rerun()
 
 # ----------------- 主界面：陈列馆展示 -----------------
 st.header("🖼️ 我的明信片陈列展厅")
