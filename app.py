@@ -5,10 +5,23 @@ from PIL import Image
 import pydeck as pdk
 import os
 
-st.set_page_config(page_title="数字博物馆", layout="wide")
-st.title("📯 极限明信片自动化管理系统 (V1.1)")
+# ─── 1. 文本常量全隔离（防止长行和中文触发网页截断） ───
+PAGE_TITLE = "数字博物馆"
+SYS_TITLE = "📯 极限明信片自动化管理系统 (V1.1)"
+SEARCH_TIPS = "🔍 搜索系列、地名、路线..."
+INFO_LINE = "路线: {} -> {}"
+INFO_RATE = "品相评级: {} ({}分)"
+BACK_TAPE_TITLE = "📬 邮戳面(脱敏)"
+FRONT_TITLE = "🌟 正面图案"
+PANEL_TITLE = "🖼️ 极限片公众陈列馆"
+ADMIN_PANEL = "📥 批量处理与后台数据核对"
+ADMIN_TITLE = "🛠️ 资产流核对控制台 (管理员可见)"
+CROP_MODE_TITLE = "🎯 隐私区域纠偏模式"
 
-# ─── 初始化模拟数据库 ───
+# ─── 2. 系统核心初始化 ───
+st.set_page_config(page_title=PAGE_TITLE, layout="wide")
+st.title(SYS_TITLE)
+
 if 'db' not in st.session_state:
     st.session_state.db = [
         {
@@ -18,32 +31,24 @@ if 'db' not in st.session_state:
             "front_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035293_iOS.jpg",
             "back_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035328_iOS.jpg",
             "is_file": False,
-            "date_from": "2026-03-20", 
-            "date_to": "2026-03-25",
-            "loc_from": "贵州开阳", 
-            "loc_to": "广东广州",
-            "from_lon": 106.96, 
-            "from_lat": 27.06, 
-            "to_lon": 113.26, 
-            "to_lat": 23.13,
+            "date_from": "2026-03-20", "date_to": "2026-03-25",
+            "loc_from": "贵州开阳", "loc_to": "广东广州",
+            "from_lon": 106.96, "from_lat": 27.06, "to_lon": 113.26, "to_lat": 23.13,
             "rating": 5, 
             "ai_reason": "完美品相。画面完整，无折痕、污渍、掉齿，油墨清晰规整。",
-            "notes": "无", 
-            "crop_box": None
+            "notes": "无", "crop_box": None
         }
     ]
 if 'current_edit_id' not in st.session_state: 
     st.session_state.current_edit_id = None
 
-# ─── 核心马赛克算法 ───
+# ─── 3. 核心高密度马赛克算法 ───
 def apply_mosaic_tape(img, box=None):
     img_np = np.array(img)
     h_orig, w_orig, _ = img_np.shape
     if box is None:
-        x1 = int(w_orig * 0.64)
-        y1 = int(h_orig * 0.53)
-        x2 = int(w_orig * 0.96)
-        y2 = int(h_orig * 0.82)
+        x1, y1 = int(w_orig * 0.64), int(h_orig * 0.53)
+        x2, y2 = int(w_orig * 0.96), int(h_orig * 0.82)
     else:
         x1, y1, x2, y2 = box
     cropped = img_np[y1:y2, x1:x2]
@@ -62,14 +67,14 @@ def apply_mosaic_tape(img, box=None):
     img_np[y1:y2, x1:x2] = cropped
     return Image.fromarray(img_np)
 
-# ─── 拆解标签页定义，防止长行截断 ───
+# ─── 4. 多功能主导航 ───
 tab_names = ["🏛️ 数字化陈列展厅", "⚙️ 批量新片入库后台", "🗺️ 邮戳足迹轨迹地图"]
 tabs = st.tabs(tab_names)
 
-# ==================== 页签 1：陈列展厅 ====================
+# ==================== 页签 1：数字化陈列展厅 ====================
 with tabs[0]:
-    st.header("🖼️ 极限片公众陈列馆")
-    search = st.text_input("🔍 搜索系列、地名、路线...")
+    st.header(PANEL_TITLE)
+    search = st.text_input(SEARCH_TIPS)
     
     display_cards = []
     for c in st.session_state.db:
@@ -84,6 +89,18 @@ with tabs[0]:
             with cols[idx % 3]:
                 st.subheader(card.get('title', '未命名'))
                 
-                # 💡 拆解 st.tabs 这一行，彻底防范 SyntaxError
-                sub_tabs = ["🌟 正面图案", "📬 邮戳面(脱敏)"]
-                t1, t2 = st.
+                # 💡 彻底压成单英文变量名，完全消灭截断报错
+                sub_tabs_list = [FRONT_TITLE, BACK_TAPE_TITLE]
+                t1, t2 = st.tabs(sub_tabs_list)
+                
+                with t1: 
+                    st.image(card.get('front_url'), use_column_width=True)
+                with t2:
+                    if not card.get('is_file', False):
+                        st.image(card.get('back_url'), use_column_width=True)
+                    else:
+                        p_back = apply_mosaic_tape(card.get('back_url'), card.get('crop_box'))
+                        st.image(p_back, use_column_width=True)
+                st.write(INFO_LINE.format(card.get('loc_from', '-'), card.get('loc_to', '-')))
+                stars = '⭐' * card.get('rating', 5)
+                st.write(INFO_RATE.format(stars, card
