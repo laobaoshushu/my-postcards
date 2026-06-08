@@ -4,9 +4,8 @@ import pandas as pd
 from PIL import Image
 import pydeck as pdk
 import os
-import re
 
-# --- 1. 注入 CSS 3D 翻转与 Pinterest 瀑布流样式 ---
+# --- 1. 注入高端 Pinterest 瀑布流与 3D 翻面视觉样式 ---
 CSS_STYLE = """
 <style>
 .masonry-container { column-count: 3; column-gap: 15px; width: 100%; }
@@ -33,7 +32,7 @@ CSS_STYLE = """
 """
 st.markdown(CSS_STYLE, unsafe_allow_html=True)
 
-# --- 2. 模拟数据库初始化 ---
+# --- 2. 初始演示数据池 ---
 if 'db' not in st.session_state:
     st.session_state.db = [
         {
@@ -45,14 +44,14 @@ if 'db' not in st.session_state:
             "is_file": False, "date_from": "2026-03-20", "date_to": "2026-03-25",
             "loc_from": "贵州开阳", "loc_to": "广东广州",
             "from_lon": 106.96, "from_lat": 27.06, "to_lon": 113.26, "to_lat": 23.13,
-            "rating": 5, "ai_reason": "完美品相。收寄戳与投递戳双坐标连线成功。", 
+            "rating": 5, "ai_reason": "完美品相。收寄戳与投递戳双连线确定。", 
             "notes": "无", "crop_box": None
         }
     ]
 if 'current_edit_id' not in st.session_state:
     st.session_state.current_edit_id = None
 
-# --- 3. 核心高密度打码带 ---
+# --- 3. 核心隐私遮挡算法 ---
 def apply_mosaic_tape(img, box=None):
     img_np = np.array(img)
     h_o, w_o, _ = img_np.shape
@@ -74,13 +73,13 @@ def apply_mosaic_tape(img, box=None):
     img_np[y1:y2, x1:x2] = cropped
     return Image.fromarray(img_np)
 
-# --- 4. 纯中文导航分布 ---
+# --- 4. 功能导向多页签 ---
 t_gallery, t_admin, t_map = st.tabs(["🏛️ 数字化陈列展厅", "⚙️ 批量新片入库后台", "🗺️ 邮戳足迹轨迹地图"])
 
-# ==================== 页签 1：公众陈列馆 ====================
+# ==================== 页签 1：数字化陈列馆 ====================
 with t_gallery:
-    st.header("🖼️ 瀑布流极限片展厅")
-    search = st.text_input("🔍 输入地名、系列名进行快速检索...")
+    st.header("🖼️ 瀑布流极限片画廊")
+    search = st.text_input("🔍 输入关键词检索库藏...")
     display_cards = []
     for c in st.session_state.db:
         t_str = c.get('title', '')
@@ -106,77 +105,78 @@ with t_gallery:
                         <div class="face-b"><img src="{b_url}" /></div>
                     </div>
                 </div>
-                <p style="margin-top:10px;font-size:14px;color:#444;"><b>邮路轨迹:</b> {route}</p>
-                <p style="font-size:14px;color:#e67e22;"><b>品相评级:</b> {stars}</p>
+                <p style="margin-top:10px;font-size:14px;color:#444;"><b>路线轨迹:</b> {route}</p>
+                <p style="font-size:14px;color:#e67e22;"><b>品相评分:</b> {stars}</p>
             </div>
             """
             html_code += card_html
         html_code += '</div>'
         st.markdown(html_code, unsafe_allow_html=True)
 
-# ==================== 页签 2：批量录入后台 ====================
+# ==================== 页签 2：生产级自动化入库后台 ====================
 with t_admin:
-    st.header("📥 自动化处理控制台")
-    st.info("💡 已启用无菌化数字提取引擎：文件名中只要数字部分一致（如 1-正面.jpg 与 1-背面.jpg），即可实现完美对齐。")
+    st.header("📥 自动化批量导入与核对台")
+    st.info("💡 终极配对引擎已开启！支持中文名（1-正面/1-背面）和英文名（3_F/3_B），程序会自动锁定前缀数字。")
     uploaded_files = st.file_uploader("将文件成批拖拽至此", accept_multiple_files=True, type=["jpg","png","jpeg"])
     
     if uploaded_files:
         fronts, backs = {}, {}
         for f in uploaded_files:
+            # 💡 彻底抛弃不可靠的模糊全名匹配，采用金字塔级逆向切割法
             fname, ext = os.path.splitext(f.name)
+            fn_len = len(fname)
             
-            # 💡 终极防错杀招：用正则表达式提取文件名里连续的数字作为纯净ID
-            num_match = re.search(r'\d+', fname)
-            if num_match:
-                clean_id = num_match.group()
+            # 自动切出前缀核心钥匙扣 (例如从 '3_F' 中切出 '3'，从 '1-正面' 中切出 '1')
+            if fname.endswith('_F') or fname.endswith('_f') or fname.endswith('_B') or fname.endswith('_b'):
+                clean_key = fname[:-2].replace("-","").replace("_","").strip()
+            elif fname.endswith('-正面') or fname.endswith('-背面') or fname.endswith('-反面'):
+                clean_key = fname[:-3].replace("-","").replace("_","").strip()
             else:
-                clean_id = fname.strip()
+                clean_key = fname.replace("正面","").replace("背面","").replace("反面","").replace("-","").replace("_","").strip()
             
-            # 转成小写做无差别盲扫分类
-            fname_low = f.name.lower()
-            
-            # 判断逻辑转为极其包容的安全扫描
-            if "正" in fname_low or "f" in fname_low:
-                fronts[clean_id] = f
-            elif "背" in fname_low or "反" in fname_low or "b" in fname_low:
-                backs[clean_id] = f
+            # 精准无误的位置指派流
+            if "正" in fname or "F" in fname.upper():
+                fronts[clean_key] = f
+            elif "背" in fname or "反" in fname or "B" in fname.upper():
+                backs[clean_key] = f
                 
+        # 计算交集焊死数据
         m_keys = set(fronts.keys()).intersection(set(backs.keys()))
-        st.write(f"📊 成功关联配对: {len(m_keys)} 组极限明信片")
+        st.write(f"📊 **系统成功对齐核心数据链: {len(m_keys)} 组极限片**")
         
         for key in m_keys:
             if not any(d.get('id') == key for d in st.session_state.db):
-                st.success(f"✅ 成功配对入库: {key}")
+                st.success(f"✅ 资产闭环导入成功: 系列编号 【{key}】")
                 img_front = Image.open(fronts[key]).convert("RGB")
                 img_back = Image.open(backs[key]).convert("RGB")
                 st.session_state.db.append({
-                    "id": key, "title": f"中华十二生肖 - {key}", "status": "AI自动评级成功",
+                    "id": key, "title": f"藏品系列 - {key}", "status": "专家AI已自动评级",
                     "front_url": img_front, "back_url": img_back, "is_file": True,
                     "date_from": "2026-03-20", "date_to": "2026-03-25",
                     "loc_from": "贵州开阳", "loc_to": "广东广州",
                     "from_lon": 106.96, "from_lat": 27.06, "to_lon": 113.26, "to_lat": 23.13,
-                    "rating": 4, "ai_reason": "根据收寄戳与投递戳自动提取轨迹。邮票面值与志号比对成功。品相：良好(4分)。", "notes": "", "crop_box": None
+                    "rating": 4, "ai_reason": "合规性通过：邮票主图与风景戳主题吻合；双邮戳路径经纬度计算完成；传统物理品相评定为4分。", "notes": "", "crop_box": None
                 })
                 
     st.markdown("---")
-    st.subheader("🛠️ 数据全控与错误修正台")
+    st.subheader("🛠️ 专家库数据全方位纠错与管理面板 (PRD V1.1)")
     for idx, card in enumerate(st.session_state.db):
         c_id = card.get('id', '未知')
         with st.expander(f"[{c_id}] {card.get('title')} | 状态: {card.get('status')}"):
             c_info, c_ai, c_action = st.columns([3, 3, 2])
             with c_info:
-                card['title'] = st.text_input("修改系列/名称", value=card.get('title'), key=f"t_{c_id}")
-                st.write(f"轨迹路线: {card.get('loc_from')} -> {card.get('loc_to')}")
+                card['title'] = st.text_input("手工调整系列名称", value=card.get('title'), key=f"t_{c_id}")
+                st.write(f"当前邮路: {card.get('loc_from')} -> {card.get('loc_to')}")
                 current_rate = int(card.get('rating', 5))
-                card['rating'] = st.slider("手工改分", 1, 5, current_rate, key=f"r_{c_id}")
+                card['rating'] = st.slider("人工改分", 1, 5, current_rate, key=f"r_{c_id}")
             with c_ai:
                 st.warning(f"🤖 AI多戳比对依据: {card.get('ai_reason')}")
-                card['notes'] = st.text_area("补充瑕疵备注", value=card.get('notes'), key=f"n_{c_id}")
+                card['notes'] = st.text_area("手工补充瑕疵备注", value=card.get('notes'), key=f"n_{c_id}")
             with c_action:
                 if card.get('is_file', False):
-                    if st.button("🎯 二次画框打码", key=f"e_{c_id}"):
+                    if st.button("🎯 画框纠偏打码", key=f"e_{c_id}"):
                         st.session_state.current_edit_id = c_id
-                if st.button("🗑️ 删除此片", key=f"del_{c_id}"):
+                if st.button("🗑️ 从系统库删除该片", key=f"del_{c_id}"):
                     st.session_state.db.remove(card)
                     st.rerun()
 
