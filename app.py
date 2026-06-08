@@ -31,66 +31,53 @@ uploaded_front = st.sidebar.file_uploader("上传明信片正面 (Pattern)", typ
 uploaded_back = st.sidebar.file_uploader("上传明信片反面 (Postmark)", type=["jpg", "png", "jpeg"])
 
 if uploaded_front and uploaded_back:
-    st.sidebar.success("图片上传成功！正在绘制浅色生肖像素遮挡...")
+    st.sidebar.success("图片上传成功！正在精确生成浅色涂改带马赛克...")
     
-    # ─── 浅色系生肖鼠像素画算法 ───
+    # ─── 精准浅色马赛克涂改带算法 ───
     back_img = Image.open(uploaded_back).convert("RGB")
     width, height = back_img.size
     
-    # 1. 定位地址文字区域
-    crop_box = (int(width * 0.62), int(height * 0.52), int(width * 0.98), int(height * 0.82))
+    # 1. 重新精确校准地址贴范围 (紧凑贴合你明信片右下角的白条区域)
+    # 缩回边界，防止压到上方的邮戳和下方的边缘
+    crop_box = (int(width * 0.64), int(height * 0.53), int(width * 0.96), int(height * 0.81))
     cropped_zone = back_img.crop(crop_box)
     
     img_array = np.array(cropped_zone)
     h_zone, w_zone, _ = img_array.shape
     
-    # 2. 定义一个 12x16 的生肖鼠像素矩阵（1代表图案，0代表背景）
-    RAT_PATTERN = [
-        [0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0],
-        [0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0],
-        [0,0,0,1,1,1,0,0,1,1,1,1,0,0,0,0],
-        [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
-        [0,1,1,1,0,0,1,1,1,0,1,1,1,1,0,0],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
-        [1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1],
-        [1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,1],
-        [0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
-        [0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
-        [0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0],
-        [0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0],
-    ]
+    # 2. 将马赛克颗粒变小（从16缩小到6），大幅提高密度，确保文字100%被彻底打碎无法识别
+    pixel_size = 6 
     
-    # 3. 设定浅色系配色
-    COLOR_BG = [250, 245, 235]       # 极浅的米白纸张底色
-    COLOR_RAT_1 = [245, 180, 180]    # 柔和浅粉红
-    COLOR_RAT_2 = [250, 225, 160]    # 柔和浅米黄
+    # 3. 换用更高级、更淡雅的浅色系（马卡龙柔和色）
+    COLOR_1 = [245, 210, 210]  # 淡樱花粉
+    COLOR_2 = [252, 240, 210]  # 淡香草黄
+    COLOR_3 = [245, 245, 238]  # 接近原本纸张的极浅米白
     
-    rows = len(RAT_PATTERN)
-    cols_count = len(RAT_PATTERN[0])
-    pixel_h = h_zone // rows
-    pixel_w = w_zone // cols_count
-    
-    # 4. 遍历矩阵绘制像素画（严格核对缩进）
-    for r in range(rows):
-        for c in range(cols_count):
-            y_start = r * pixel_h
-            y_end = min((r + 1) * pixel_h, h_zone)
-            x_start = c * pixel_w
-            x_end = min((c + 1) * pixel_w, w_zone)
+    # 4. 高密度无缝填充
+    for y in range(0, h_zone, pixel_size):
+        for x in range(0, w_zone, pixel_size):
+            y_end = min(y + pixel_size, h_zone)
+            x_end = min(x + pixel_size, w_zone)
             
-            if RAT_PATTERN[r][c] == 1:
-                chosen_color = COLOR_RAT_1 if (r + c) % 2 == 0 else COLOR_RAT_2
+            # 使用三分法逻辑让三种浅色随机/交错排列，形成细腻的编织涂改带质感
+            grid_x = x // pixel_size
+            grid_y = y // pixel_size
+            
+            if (grid_x + grid_y) % 3 == 0:
+                chosen_color = COLOR_1
+            elif (grid_x + grid_y) % 3 == 1:
+                chosen_color = COLOR_2
             else:
-                chosen_color = COLOR_BG
+                chosen_color = COLOR_3
                 
-            img_array[y_start:y_end, x_start:x_end] = chosen_color
+            img_array[y:y_end, x:x_end] = chosen_color
             
-    # 5. 把像素画拼回原图
+    # 5. 把像素涂改带拼回原图
     mosaic_zone = Image.fromarray(img_array)
     back_img.paste(mosaic_zone, crop_box)
     # ─── 算法结束 ───
     
-    st.sidebar.image(back_img, caption="艺术像素画隐私脱敏预览", use_column_width=True)
+    st.sidebar.image(back_img, caption="精准涂改带马赛克预览", use_column_width=True)
     
     # 录入表单
     st.sidebar.subheader("信息核对")
