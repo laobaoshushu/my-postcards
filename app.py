@@ -31,35 +31,62 @@ uploaded_front = st.sidebar.file_uploader("上传明信片正面 (Pattern)", typ
 uploaded_back = st.sidebar.file_uploader("上传明信片反面 (Postmark)", type=["jpg", "png", "jpeg"])
 
 if uploaded_front and uploaded_back:
-    st.sidebar.success("图片上传成功！正在精确生成浅色涂改带马赛克...")
+    st.sidebar.success("图片上传成功！正在智能识别地址标签...")
     
-    # ─── 精准浅色马赛克涂改带算法 ───
-    back_img = Image.open(uploaded_back).convert("RGB")
-    width, height = back_img.size
+    # 读取原始图片
+    original_img = Image.open(uploaded_back).convert("RGB")
+    img_np = np.array(original_img)
+    h_orig, w_orig, _ = img_np.shape
     
-    # 1. 重新精确校准地址贴范围 (紧凑贴合你明信片右下角的白条区域)
-    # 缩回边界，防止压到上方的邮戳和下方的边缘
-    crop_box = (int(width * 0.64), int(height * 0.53), int(width * 0.96), int(height * 0.81))
-    cropped_zone = back_img.crop(crop_box)
+    # ─── 智能名址贴轮廓识别算法 ───
+    # 1. 默认保底区域（万一AI识别失败，采用这个紧凑区域保底）
+    x1, y1, x2, y2 = int(w_orig * 0.64), int(h_orig * 0.53), int(w_orig * 0.96), int(h_orig * 0.82)
     
-    img_array = np.array(cropped_zone)
-    h_zone, w_zone, _ = img_array.shape
+    try:
+        # 转为 OpenCV 的 BGR 格式进行图像处理
+        gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        
+        # 针对右下角名址贴进行二值化：把白色的名址标签纸凸显出来
+        _, thresh = cv2.threshold(gray, 220, 255, cv2.THRESH_BINARY)
+        
+        # 寻找图像中的所有闭合轮廓
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        best_box = None
+        max_area = 0
+        
+        for cnt in contours:
+            x, y, w, h = cv2.boundingRect(cnt)
+            # 过滤条件：地址贴应该在右下角，且面积大小要适中
+            if x > w_orig * 0.5 and y > h_orig * 0.4:
+                area = w * h
+                # 寻找右下角面积最大的那个白色矩形块
+                if area > max_area and w > w_orig * 0.2 and h > h_orig * 0.1:
+                    max_area = area
+                    best_box = (x, y, x + w, y + h)
+        
+        if best_box:
+            # 成功识别到白色地址标签，内缩2像素使马赛克边缘更贴合，不溢出白条
+            x1, y1, x2, y2 = best_box
+            x1, y1, x2, y2 = x1 + 2, y1 + 2, x2 - 2, y2 - 2
+    except Exception as e:
+        pass # 如果识别出错，自动降级使用默认保底区域
+        
+    # 2. 精准裁剪识别出来的地址块
+    cropped_zone = img_np[y1:y2, x1:x2]
+    h_zone, w_zone, _ = cropped_zone.shape
     
-    # 2. 将马赛克颗粒变小（从16缩小到6），大幅提高密度，确保文字100%被彻底打碎无法识别
-    pixel_size = 6 
+    # 3. 生成极高密度的微型浅色像素点（5x5像素，彻底糊掉文字）
+    pixel_size = 5
+    COLOR_1 = [245, 215, 215]  # 浅樱花粉
+    COLOR_2 = [252, 242, 215]  # 浅香草黄
+    COLOR_3 = [248, 248, 242]  # 极浅米白
     
-    # 3. 换用更高级、更淡雅的浅色系（马卡龙柔和色）
-    COLOR_1 = [245, 210, 210]  # 淡樱花粉
-    COLOR_2 = [252, 240, 210]  # 淡香草黄
-    COLOR_3 = [245, 245, 238]  # 接近原本纸张的极浅米白
-    
-    # 4. 高密度无缝填充
     for y in range(0, h_zone, pixel_size):
         for x in range(0, w_zone, pixel_size):
             y_end = min(y + pixel_size, h_zone)
             x_end = min(x + pixel_size, w_zone)
             
-            # 使用三分法逻辑让三种浅色随机/交错排列，形成细腻的编织涂改带质感
             grid_x = x // pixel_size
             grid_y = y // pixel_size
             
@@ -70,14 +97,14 @@ if uploaded_front and uploaded_back:
             else:
                 chosen_color = COLOR_3
                 
-            img_array[y:y_end, x:x_end] = chosen_color
+            cropped_zone[y:y_end, x:x_end] = chosen_color
             
-    # 5. 把像素涂改带拼回原图
-    mosaic_zone = Image.fromarray(img_array)
-    back_img.paste(mosaic_zone, crop_box)
+    # 4. 把处理好的高密度像素涂改带贴回原图
+    img_np[y1:y2, x1:x2] = cropped_zone
+    back_img = Image.fromarray(img_np)
     # ─── 算法结束 ───
     
-    st.sidebar.image(back_img, caption="精准涂改带马赛克预览", use_column_width=True)
+    st.sidebar.image(back_img, caption="智能动态遮挡预览", use_column_width=True)
     
     # 录入表单
     st.sidebar.subheader("信息核对")
