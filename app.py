@@ -107,15 +107,16 @@ with tabs[1]:
         fronts, backs = {}, {}
         for f in uploaded_files:
             name, ext = os.path.splitext(f.name)
-            if "正面" in name or "_F" in name:
-                k = name.replace("正面","").replace("_F","")
+            # 💡 核心优化：兼容“正面/F”，以及“反面/背面/B”的命名方式
+            if "正面" in name or "_F" in name or "-正面" in name:
+                k = name.replace("正面","").replace("_F","").replace("-","")
                 fronts[k] = f
-            elif "反面" in name or "_B" in name:
-                k = name.replace("反面","").replace("_B","")
+            elif "反面" in name or "背面" in name or "_B" in name or "-反面" in name or "-背面" in name:
+                k = name.replace("反面","").replace("背面","").replace("_B","").replace("-","")
                 backs[k] = f
                 
         matched_keys = set(fronts.keys()) & set(backs.keys())
-        st.write(f"成功配对: {len(matched_keys)} 组")
+        st.write(f"成功配对: {len(matched_keys)} 组明信片")
         
         for key in matched_keys:
             exists = any(d['id'] == key for d in st.session_state.db)
@@ -191,7 +192,6 @@ with tabs[2]:
     st.header("🗺️ 极限片邮路足迹馆")
     plot_data = []
     for card in st.session_state.db:
-        # 把引发报错的长代码彻底拆解成超短行
         id_str = card['id']
         f_lon = card['from_lon']
         f_lat = card['from_lat']
