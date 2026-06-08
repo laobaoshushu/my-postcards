@@ -5,7 +5,7 @@ from PIL import Image
 import pydeck as pdk
 import os
 
-# --- 1. 中文常量与自定义 CSS 混入 ---
+# --- 1. 注入 CSS 3D 翻转与 Pinterest 瀑布流样式 ---
 CSS_STYLE = """
 <style>
 .masonry-container { column-count: 3; column-gap: 15px; width: 100%; }
@@ -96,7 +96,6 @@ with t_gallery:
             route = f"{card.get('loc_from')} ➡️ {card.get('loc_to')}"
             stars = '⭐' * card.get('rating', 5)
             
-            # HTML DOM 注入实现鼠标悬停/手指轻触自动 3D 翻面
             card_html = f"""
             <div class="card-item">
                 <h4>{title}</h4>
@@ -117,22 +116,23 @@ with t_gallery:
 # ==================== 页签 2：批量录入后台 ====================
 with t_admin:
     st.header("📥 自动化处理控制台")
-    st.info("💡 已经完美支持中文文件名！请放心上传包含'正面'、'反面'或'背面'的文件。")
+    st.info("💡 强力文件名清洗引擎：支持形如 '1-正面.jpg / 1-背面.jpg' 或 '1_F.jpg / 1_B.jpg'")
     uploaded_files = st.file_uploader("将文件成批拖拽至此", accept_multiple_files=True, type=["jpg","png","jpeg"])
     
     if uploaded_files:
         fronts, backs = {}, {}
         for f in uploaded_files:
-            name, ext = os.path.splitext(f.name)
-            # 💡 核心中文配对逻辑恢复
-            is_f = "正面" in name or "_F" in name or "_f" in name
-            is_b = "反面" in name or "背面" in name or "_B" in name or "_b" in name
-            if is_f:
-                k = name.replace("正面","").replace("_F","").replace("_f","").replace("-","").strip()
-                fronts[k] = f
-            elif is_b:
-                k = name.replace("反面","").replace("背面","").replace("_B","").replace("_b","").replace("-","").strip()
-                backs[k] = f
+            fname, ext = os.path.splitext(f.name)
+            # 🌟 终极强悍清洗：直接移除连字符和汉字干扰，提取纯数字ID进行绝对匹配
+            clean_id = fname.replace("正面","").replace("背面","").replace("反面","")
+            clean_id = clean_id.replace("_F","").replace("_B","").replace("_f","").replace("_b","")
+            clean_id = clean_id.replace("-","").replace("_","").strip()
+            
+            # 根据特征字符判定正反面
+            if "正面" in fname or "F" in fname.upper():
+                fronts[clean_id] = f
+            elif "背面" in fname or "反面" in fname or "B" in fname.upper():
+                backs[clean_id] = f
                 
         m_keys = set(fronts.keys()).intersection(set(backs.keys()))
         st.write(f"📊 成功关联配对: {len(m_keys)} 组极限明信片")
