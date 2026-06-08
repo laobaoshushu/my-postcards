@@ -1,20 +1,20 @@
 import streamlit as st
 import cv2
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageFilter
 
 # 设置页面基本信息
 st.set_page_config(page_title="我的极限明信片数字馆", layout="wide")
 st.title("📯 极限明信片数字化管理系统")
 st.write("零本地环境，全云端驱动的明信片收藏馆")
 
-# 模拟数据库（实际应用中可对接Google Sheets或云数据库，这里用SessionState做演示）
+# 模拟数据库
 if 'cards' not in st.session_state:
     st.session_state.cards = [
         {
             "id": 1,
             "title": "中华十二生肖 - 子鼠",
-            "front_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035293_iOS.jpg", # 替换为你Google相册的外链
+            "front_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035293_iOS.jpg",
             "back_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035328_iOS.jpg",
             "date_from": "2026-03-20",
             "date_to": "2026-03-25",
@@ -31,19 +31,36 @@ uploaded_front = st.sidebar.file_uploader("上传明信片正面 (Pattern)", typ
 uploaded_back = st.sidebar.file_uploader("上传明信片反面 (Postmark)", type=["jpg", "png", "jpeg"])
 
 if uploaded_front and uploaded_back:
-    st.sidebar.success("图片上传成功！正在启动AI识别与隐私脱敏...")
+    st.sidebar.success("图片上传成功！正在生成艺术毛玻璃遮挡...")
     
-    # 【模拟智能马赛克处理】
-    # 原理：读取反面图片，在特定区域（如右下角地址栏）画一个灰色矩形覆盖
-    back_img = Image.open(uploaded_back)
+    # ─── 高级红黄毛玻璃算法 ───
+    back_img = Image.open(uploaded_back).convert("RGB")
     width, height = back_img.size
-    draw = ImageDraw.Draw(back_img)
-    # 模拟定位手写地址区域并打码（实际可用OCR定位）
-    draw.rectangle([width*0.6, height*0.5, width*0.95, height*0.85], fill="#808080")
     
-    st.sidebar.image(back_img, caption="反面隐私脱敏预览", use_column_width=True)
+    # 1. 确定遮挡的区域（针对你提供的明信片格式，动态定位右下角地址栏文字）
+    # 仅遮挡文字部分，不破坏周围的空白和邮戳
+    crop_box = (int(width * 0.62), int(height * 0.52), int(width * 0.98), int(height * 0.82))
+    cropped_zone = back_img.crop(crop_box)
     
-    # 录入表单（AI自动预填，人工微调）
+    # 2. 制作毛玻璃效果：极度模糊文字
+    blurred_zone = cropped_zone.filter(ImageFilter.GaussianBlur(radius=15))
+    
+    # 3. 注入红黄暖色调（艺术滤镜）
+    # 将图片转为矩阵以便调整色彩
+    img_array = np.array(blurred_zone).astype(np.float32)
+    # 增强红色通道(R)和绿色通道(G)，混合出温暖的红黄色调，同时保持原本文字的光影感
+    img_array[:, :, 0] = np.clip(img_array[:, :, 0] * 1.4 + 40, 0, 255) # 增强红
+    img_array[:, :, 1] = np.clip(img_array[:, :, 1] * 1.1 + 20, 0, 255) # 增强黄
+    img_array[:, :, 2] = np.clip(img_array[:, :, 2] * 0.7, 0, 255)      # 压低蓝
+    
+    # 4. 把调色后的毛玻璃拼回原图
+    final_blurred_zone = Image.fromarray(img_array.astype(np.uint8))
+    back_img.paste(final_blurred_zone, crop_box)
+    # ─── 算法结束 ───
+    
+    st.sidebar.image(back_img, caption="红黄毛玻璃隐私脱敏预览", use_column_width=True)
+    
+    # 录入表单
     st.sidebar.subheader("信息核对")
     title = st.sidebar.text_input("系列/名称", value="中华十二生肖 - 未命名")
     loc_from = st.sidebar.text_input("寄发地", value="AI识别中...")
@@ -51,12 +68,11 @@ if uploaded_front and uploaded_back:
     rating = st.sidebar.slider("给极限片评级", 1, 5, 5)
     
     if st.sidebar.button("确认入库"):
-        # 将新数据存入系统
         st.session_state.cards.append({
             "id": len(st.session_state.cards) + 1,
             "title": title,
-            "front_url": uploaded_front, # 实际应上传至云存储
-            "back_url": back_img,
+            "front_url": uploaded_front,
+            "back_url": back_img, 
             "date_from": str(date_from),
             "date_to": "-",
             "loc_from": loc_from,
@@ -73,7 +89,7 @@ st.header("🖼️ 我的明信片陈列展厅")
 search_query = st.text_input("🔍 搜索系列、地名或时间...")
 
 # 展现明信片列表
-cols = st.columns(3) # 每行显示3张
+cols = st.columns(3)
 
 for idx, card in enumerate(st.session_state.cards):
     if search_query and search_query not in card['title'] and search_query not in card['loc_from']:
@@ -82,14 +98,12 @@ for idx, card in enumerate(st.session_state.cards):
     with cols[idx % 3]:
         st.subheader(card['title'])
         
-        # 网页端交互：通过页签切换正反面，完美平替“3D翻转”
         tab1, tab2 = st.tabs(["🌟 正面图案", "📬 邮戳反面 (已脱敏)"])
         with tab1:
             st.image(card['front_url'], use_column_width=True)
         with tab2:
             st.image(card['back_url'], use_column_width=True)
             
-        # 结构化信息陈列
         st.markdown(f"""
         * **寄发路线**：{card['loc_from']} ➡️ {card['loc_to']}
         * **寄发日期**：{card['date_from']}
