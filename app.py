@@ -1,6 +1,8 @@
 import streamlit as st
 import numpy as np
 from PIL import Image
+# 引入鼠标框选核心插件
+from streamlit_cropper import st_cropper
 
 # 设置页面基本信息
 st.set_page_config(page_title="我的极限明信片数字馆", layout="wide")
@@ -34,63 +36,66 @@ if uploaded_front and uploaded_back:
     
     # 读取原始图片
     original_img = Image.open(uploaded_back).convert("RGB")
+    
+    # ─── 鼠标直接画框交互界面 ───
+    st.sidebar.subheader("🎯 鼠标框选地址区域")
+    st.sidebar.info("请在右侧的大图上，直接用鼠标拖拽、调整选框，对准你要遮挡的地址文字。")
+    
+    # 在页面主主体区域（或者侧边栏，这里放在侧边栏展示框选器）
+    # 允许自由矩形框选（realtime_update=True 实时更新，box_color 设定选框颜色为显眼的红色）
+    cropped_image_info = st_cropper(
+        original_img, 
+        realtime_update=True, 
+        box_color='#FF0000', 
+        aspect_ratio=None,
+        return_type='box'
+    )
+    
+    # 获取鼠标框选的精准像素坐标
+    # 插件返回的格式是比例字典: {'x': 0.x, 'y': 0.y, 'w': 0.w, 'h': 0.h}
     w_orig, h_orig = original_img.size
+    x1 = int(cropped_image_info['left'])
+    y1 = int(cropped_image_info['top'])
+    x2 = x1 + int(cropped_image_info['width'])
+    y2 = y1 + int(cropped_image_info['height'])
     
-    # ─── 手动交互式视觉修正控制台 ───
-    st.sidebar.subheader("🎯 微调遮挡范围")
-    st.sidebar.write("通过下方滑块，完美对齐右侧明信片上的地址区域：")
-    
-    # 默认值设定在大概的右下角
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        x_start_pct = st.slider("左边界位置 (%)", 0, 100, 60)
-        y_start_pct = st.slider("上边界位置 (%)", 0, 100, 50)
-    with col2:
-        x_end_pct = st.slider("右边界位置 (%)", 0, 100, 98)
-        y_end_pct = st.slider("下边界位置 (%)", 0, 100, 85)
+    # 安全容错，确保选框有面积
+    if (x2 - x1) > 5 and (y2 - y1) > 5:
+        img_np = np.array(original_img)
+        cropped_zone = img_np[y1:y2, x1:x2]
+        h_zone, w_zone, _ = cropped_zone.shape
         
-    # 计算实际像素坐标
-    x1, y1 = int(w_orig * (x_start_pct / 100)), int(h_orig * (y_start_pct / 100))
-    x2, y2 = int(w_orig * (x_end_pct / 100)), int(h_orig * (y_end_pct / 100))
-    
-    # 防止边界颠倒异常
-    if x2 <= x1: x2 = x1 + 10
-    if y2 <= y1: y2 = y1 + 10
-    
-    # 开始生成涂改带
-    img_np = np.array(original_img)
-    cropped_zone = img_np[y1:y2, x1:x2]
-    h_zone, w_zone, _ = cropped_zone.shape
-    
-    # 生成高密度编织马赛克效果
-    pixel_size = 5
-    COLOR_1 = [245, 215, 215]  # 浅樱花粉
-    COLOR_2 = [252, 242, 215]  # 浅香草黄
-    COLOR_3 = [248, 248, 242]  # 极浅米白
-    
-    for y in range(0, h_zone, pixel_size):
-        for x in range(0, w_zone, pixel_size):
-            y_end = min(y + pixel_size, h_zone)
-            x_end = min(x + pixel_size, w_zone)
-            
-            grid_x = x // pixel_size
-            grid_y = y // pixel_size
-            
-            if (grid_x + grid_y) % 3 == 0:
-                chosen_color = COLOR_1
-            elif (grid_x + grid_y) % 3 == 1:
-                chosen_color = COLOR_2
-            else:
-                chosen_color = COLOR_3
+        # 填充高密度浅色系编织马赛克效果
+        pixel_size = 5
+        COLOR_1 = [245, 215, 215]  # 浅樱花粉
+        COLOR_2 = [252, 242, 215]  # 浅香草黄
+        COLOR_3 = [248, 248, 242]  # 极浅米白
+        
+        for y in range(0, h_zone, pixel_size):
+            for x in range(0, w_zone, pixel_size):
+                y_end = min(y + pixel_size, h_zone)
+                x_end = min(x + pixel_size, w_zone)
                 
-            cropped_zone[y:y_end, x:x_end] = chosen_color
-            
-    # 将涂改带精准贴回
-    img_np[y1:y2, x1:x2] = cropped_zone
-    back_img = Image.fromarray(img_np)
+                grid_x = x // pixel_size
+                grid_y = y // pixel_size
+                
+                if (grid_x + grid_y) % 3 == 0:
+                    chosen_color = COLOR_1
+                elif (grid_x + grid_y) % 3 == 1:
+                    chosen_color = COLOR_2
+                else:
+                    chosen_color = COLOR_3
+                    
+                cropped_zone[y:y_end, x:x_end] = chosen_color
+                
+        # 将生成的精美涂改带贴回鼠标框选的区域
+        img_np[y1:y2, x1:x2] = cropped_zone
+        final_processed_img = Image.fromarray(img_np)
+    else:
+        final_processed_img = original_img
     
-    # 动态预览
-    st.sidebar.image(back_img, caption="实时微调预览（请检查是否完美遮挡）", use_column_width=True)
+    # 展示最终脱敏效果预览
+    st.sidebar.image(final_processed_img, caption="最终遮挡效果预览", use_column_width=True)
     
     # 录入表单
     st.sidebar.subheader("信息核对")
@@ -104,7 +109,7 @@ if uploaded_front and uploaded_back:
             "id": len(st.session_state.cards) + 1,
             "title": title,
             "front_url": uploaded_front,
-            "back_url": back_img, 
+            "back_url": final_processed_img, 
             "date_from": str(date_from),
             "date_to": "-",
             "loc_from": loc_from,
