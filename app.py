@@ -9,14 +9,14 @@ import os
 st.set_page_config(page_title="我的极限明信片数字博物馆", layout="wide")
 st.title("📯 极限明信片自动化管理与陈列系统")
 
-# ─── 数据库持久化模拟 (初始包含一张示例明信片，支持永久外链展示) ───
+# ─── 数据库持久化模拟 (初始包含一张示例明信片) ───
 if 'db' not in st.session_state:
     st.session_state.db = [
         {
             "id": "生肖鼠_示例", "title": "中华十二生肖 - 子鼠", "status": "已入库",
             "front_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035293_iOS.jpg",
             "back_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035328_iOS.jpg",
-            "is_file_object": False,  # 标记是否是上传的文件对象
+            "is_file_object": False,
             "date_from": "2026-03-20", "date_to": "2026-03-25",
             "loc_from": "贵州开阳", "loc_to": "广东广州",
             "from_lon": 106.96, "from_lat": 27.06, "to_lon": 113.26, "to_lat": 23.13,
@@ -58,7 +58,7 @@ tabs = st.tabs(["🏛️ 数字化陈列展厅", "⚙️ 批量新片入库后�
 # ==================== 页签 1：陈列展厅 ====================
 with tabs[0]:
     st.header("🖼️ 极限片陈列馆")
-    search = st.text_input("🔍 搜索系列或地名...")
+    search = st.text_input("🔍 搜索系列、地名、路线...")
     
     # 过滤搜索数据
     display_cards = [c for c in st.session_state.db if not search or (search in c['title'] or search in c['loc_from'])]
@@ -72,11 +72,9 @@ with tabs[0]:
                 with t1: 
                     st.image(card['front_url'], use_column_width=True)
                 with t2:
-                    # 如果存储的是在线图片链接
                     if not card['is_file_object']:
                         st.image(card['back_url'], use_column_width=True)
                     else:
-                        # 如果是新上传的文件对象，动态进行马赛克脱敏加工
                         processed_back = apply_mosaic_tape(card['back_url'], card['crop_box'])
                         st.image(processed_back, use_column_width=True)
                         
@@ -106,14 +104,4 @@ with tabs[1]:
         
         for key in matched_keys:
             if not any(d['id'] == key for d in st.session_state.db):
-                st.info(f"✅ 新增自动配对组：【{key}】（AI已自动完成首次浅色马赛克遮挡、分类与评级）")
-                # 模拟AI自动提取和初次自动打码
-                img_front = Image.open(fronts[key]).convert("RGB")
-                img_back = Image.open(backs[key]).convert("RGB")
-                
-                st.session_state.db.append({
-                    "id": key, "title": f"中华十二生肖 - {key}", "status": "待核对(AI已打码)",
-                    "front_url": img_front, "back_url": img_back, "is_file_object": True,
-                    "date_from": "2026-03-20", "date_to": "2026-03-25",
-                    "loc_from": "贵州开阳", "loc_to": "广东广州",
-                    "from_lon": 106.96, "from_
+                st.info(f"✅ 新增自动配对组：【{key}】（AI已自动完成首次
