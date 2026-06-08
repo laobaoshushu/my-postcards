@@ -18,12 +18,18 @@ if 'db' not in st.session_state:
             "front_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035293_iOS.jpg",
             "back_url": "https://pub-c5e31b5cdafb419a96447ae3d707c737.r2.dev/20260403_143035328_iOS.jpg",
             "is_file": False,
-            "date_from": "2026-03-20", "date_to": "2026-03-25",
-            "loc_from": "贵州开阳", "loc_to": "广东广州",
-            "from_lon": 106.96, "from_lat": 27.06, "to_lon": 113.26, "to_lat": 23.13,
+            "date_from": "2026-03-20", 
+            "date_to": "2026-03-25",
+            "loc_from": "贵州开阳", 
+            "loc_to": "广东广州",
+            "from_lon": 106.96, 
+            "from_lat": 27.06, 
+            "to_lon": 113.26, 
+            "to_lat": 23.13,
             "rating": 5, 
             "ai_reason": "完美品相。画面完整，无折痕、污渍、掉齿，油墨清晰规整。",
-            "notes": "无", "crop_box": None
+            "notes": "无", 
+            "crop_box": None
         }
     ]
 if 'current_edit_id' not in st.session_state: 
@@ -34,8 +40,10 @@ def apply_mosaic_tape(img, box=None):
     img_np = np.array(img)
     h_orig, w_orig, _ = img_np.shape
     if box is None:
-        x1, y1 = int(w_orig * 0.64), int(h_orig * 0.53)
-        x2, y2 = int(w_orig * 0.96), int(h_orig * 0.82)
+        x1 = int(w_orig * 0.64)
+        y1 = int(h_orig * 0.53)
+        x2 = int(w_orig * 0.96)
+        y2 = int(h_orig * 0.82)
     else:
         x1, y1, x2, y2 = box
     cropped = img_np[y1:y2, x1:x2]
@@ -54,7 +62,9 @@ def apply_mosaic_tape(img, box=None):
     img_np[y1:y2, x1:x2] = cropped
     return Image.fromarray(img_np)
 
-tabs = st.tabs(["🏛️ 数字化陈列展厅", "⚙️ 批量新片入库后台", "🗺️ 邮戳足迹轨迹地图"])
+# ─── 拆解标签页定义，防止长行截断 ───
+tab_names = ["🏛️ 数字化陈列展厅", "⚙️ 批量新片入库后台", "🗺️ 邮戳足迹轨迹地图"]
+tabs = st.tabs(tab_names)
 
 # ==================== 页签 1：陈列展厅 ====================
 with tabs[0]:
@@ -73,4 +83,7 @@ with tabs[0]:
         for idx, card in enumerate(display_cards):
             with cols[idx % 3]:
                 st.subheader(card.get('title', '未命名'))
-                t1, t2 = st.tabs(
+                
+                # 💡 拆解 st.tabs 这一行，彻底防范 SyntaxError
+                sub_tabs = ["🌟 正面图案", "📬 邮戳面(脱敏)"]
+                t1, t2 = st.
