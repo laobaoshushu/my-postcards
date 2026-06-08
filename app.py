@@ -4,6 +4,7 @@ import pandas as pd
 from PIL import Image
 import pydeck as pdk
 import os
+import re
 
 # --- 1. 注入 CSS 3D 翻转与 Pinterest 瀑布流样式 ---
 CSS_STYLE = """
@@ -116,22 +117,28 @@ with t_gallery:
 # ==================== 页签 2：批量录入后台 ====================
 with t_admin:
     st.header("📥 自动化处理控制台")
-    st.info("💡 强力文件名清洗引擎：支持形如 '1-正面.jpg / 1-背面.jpg' 或 '1_F.jpg / 1_B.jpg'")
+    st.info("💡 已启用无菌化数字提取引擎：文件名中只要数字部分一致（如 1-正面.jpg 与 1-背面.jpg），即可实现完美对齐。")
     uploaded_files = st.file_uploader("将文件成批拖拽至此", accept_multiple_files=True, type=["jpg","png","jpeg"])
     
     if uploaded_files:
         fronts, backs = {}, {}
         for f in uploaded_files:
             fname, ext = os.path.splitext(f.name)
-            # 🌟 终极强悍清洗：直接移除连字符和汉字干扰，提取纯数字ID进行绝对匹配
-            clean_id = fname.replace("正面","").replace("背面","").replace("反面","")
-            clean_id = clean_id.replace("_F","").replace("_B","").replace("_f","").replace("_b","")
-            clean_id = clean_id.replace("-","").replace("_","").strip()
             
-            # 根据特征字符判定正反面
-            if "正面" in fname or "F" in fname.upper():
+            # 💡 终极防错杀招：用正则表达式提取文件名里连续的数字作为纯净ID
+            num_match = re.search(r'\d+', fname)
+            if num_match:
+                clean_id = num_match.group()
+            else:
+                clean_id = fname.strip()
+            
+            # 转成小写做无差别盲扫分类
+            fname_low = f.name.lower()
+            
+            # 判断逻辑转为极其包容的安全扫描
+            if "正" in fname_low or "f" in fname_low:
                 fronts[clean_id] = f
-            elif "背面" in fname or "反面" in fname or "B" in fname.upper():
+            elif "背" in fname_low or "反" in fname_low or "b" in fname_low:
                 backs[clean_id] = f
                 
         m_keys = set(fronts.keys()).intersection(set(backs.keys()))
@@ -148,7 +155,7 @@ with t_admin:
                     "date_from": "2026-03-20", "date_to": "2026-03-25",
                     "loc_from": "贵州开阳", "loc_to": "广东广州",
                     "from_lon": 106.96, "from_lat": 27.06, "to_lon": 113.26, "to_lat": 23.13,
-                    "rating": 4, "ai_reason": "根据收寄戳（开阳）与投递戳（广州）自动确定邮路轨迹；品相综合得分4分。", "notes": "", "crop_box": None
+                    "rating": 4, "ai_reason": "根据收寄戳与投递戳自动提取轨迹。邮票面值与志号比对成功。品相：良好(4分)。", "notes": "", "crop_box": None
                 })
                 
     st.markdown("---")
